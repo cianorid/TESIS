@@ -1,10 +1,10 @@
-# 📊 Tesis: Modelos de Volatilidad Estocástica y Filtro de Partículas
+# Tesis: Modelos de Volatilidad Estocástica y Filtro de Partículas
 
 Este repositorio contiene el código desarrollado como parte de una tesis de grado centrada en el modelado de la volatilidad en series temporales financieras. El objetivo principal es implementar un modelo de **volatilidad estocástica (SV)** y aplicar técnicas de **inferencia bayesiana (MCMC)** y **filtros secuenciales (filtro de partículas)** para estimar la volatilidad latente a partir de datos reales del mercado.
 
 ---
 
-## 🧠 Contenido
+##  Contenido
 
 El proyecto está dividido en los siguientes scripts:
 
@@ -17,7 +17,7 @@ El proyecto está dividido en los siguientes scripts:
 
 ---
 
-## 🔧 Requisitos
+##  Requisitos
 
 Para correr los scripts se necesitan las siguientes librerías de R:
 
