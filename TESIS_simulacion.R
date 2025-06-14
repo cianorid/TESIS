@@ -35,10 +35,10 @@ simular_SV <- function(T, mu, phi_h, sigma_h) {
 # ---------------------------------------------------------------------
 set.seed(124)
 # Parámetros verdaderos del modelo SV
-mu_true <- 3
-phi_h_true <- 0.5
-sigma_h_true <- 0.5
-N_mcmc <- 50000
+mu_true <- 2
+phi_h_true <- 0.92
+sigma_h_true <- 0.8
+N_mcmc <-50000
 
 # Simular datos
 sim <- simular_SV(T = 200, mu = mu_true, phi_h = phi_h_true, sigma_h = sigma_h_true)
@@ -68,7 +68,7 @@ ggplot(df, aes(x = Tiempo, y = y_t)) +
 # Dado que en la reparametrización beta1 = mu*(1-phi_h) y beta2 = phi_h,
 # definimos:
 prior_mu <- 0
-prior_phi <- 0.8
+prior_phi <- 0.7
 b0 <- c(prior_mu * (1 - prior_phi), prior_phi)  # Por ejemplo: c(0, 0.5)
 Sigma0 <- diag(c(100, 1))  # Matriz de covarianza (inversa de la matriz de precisión A)
 
@@ -122,8 +122,8 @@ plot_trace_pre_thinning <- function(chain, param_name) {
 # ---------------------------------------------------------------------
 # 2) Aplicar Thinning (si es necesario)
 # ---------------------------------------------------------------------
-thinning_step <-200
-burn_in <- 3000
+thinning_step <-150
+burn_in <- 8000
 mu <- res_mcmc$mu[seq((burn_in + 1), N_mcmc, by = thinning_step)]
 phi_h <- res_mcmc$phi_h[seq((burn_in + 1), N_mcmc, by = thinning_step)]
 sigma_h <- res_mcmc$sigma_h[seq((burn_in + 1), N_mcmc, by = thinning_step)]
