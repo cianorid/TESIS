@@ -79,6 +79,7 @@ prior_phi <- 0.8
 b0 <- c(prior_mu * (1 - prior_phi), prior_phi)  # Por ejemplo: c(0, 0.5)
 Sigma0 <- diag(c(100, 1))  # Matriz de covarianza (inversa de la matriz de precisión A)
 N_mcmc <- 50000
+set.seed(1234)
 
 # Ejecutar el MCMC
 res_mcmc <- SV_Gibbs(y = y_data, N_mcmc = N_mcmc,
@@ -123,7 +124,7 @@ acf(res_mcmc$sigma_h, main = expression("Autocorrelación de " * sigma[h]), lag.
 # ---------------------------------------------------------------------
 # 2) Aplicar Thinning (si es necesario)
 # -------------------------------------------------------------------
-thinning_step <- 100
+thinning_step <- 120
 burn_in <- 5000
 mu <- res_mcmc$mu[seq((burn_in + 1), N_mcmc, by = thinning_step)]
 phi_h <- res_mcmc$phi_h[seq((burn_in + 1), N_mcmc, by = thinning_step)]
@@ -248,9 +249,10 @@ grid.arrange(plot_hist_mu, plot_hist_phi_h, plot_hist_sigma_h, nrow = 1)
 
 
 
-# ---------------------------------------------------------------------
-# 8) Estimacion mediante filtro de particulas 
-# ---------------------------------------------------------------------
+# ----------------------------------------------------------------------------
+# 8) Predicion mediante filtro de particulas, con parametros estimados con SV
+# ----------------------------------------------------------------------------
+
 
 
 # --- Datos para Prediccion ---
@@ -269,7 +271,7 @@ y_data <- diff(log(y_data))
 
 source("TESIS_filtro_de_particulas.R")
 
-set.seed(123)
+
 # Aplicar el Filtro de Partículas con los parámetros estimados
 N_particulas <- 1000
 h_est <- filtro_particulas(y_data, N_particulas, mu_posterior_mean, phi_h_posterior_mean, sigma_h_posterior_mean )
@@ -341,28 +343,28 @@ print(result_prediction_chi)
 
 
 graficar_densidades_evolutivas_facets <- function(h_estimado,
-                                                  tiempos = 15,
-                                                  rango_y = c(-0.15, 0.15)) {
-  T      <- length(h_estimado)
-  idx_t  <- round(seq(1, T, length.out = tiempos))
-  y_vals <- seq(rango_y[1], rango_y[2], length.out = 500)
-  
-  # construir data.frame largo
-  df_list <- lapply(idx_t, function(t) {
-    var_t <- exp(h_estimado[t])
-    data.frame(t   = factor(t),
-               y   = y_vals,
-               pdf = dnorm(y_vals, 0, sqrt(var_t)))
-  })
-  datos <- do.call(rbind, df_list)
-  
-  ggplot(datos, aes(x = y, y = pdf)) +
-    geom_line(colour = "steelblue", linewidth = 1) +
-    facet_wrap(~ t, ncol = 3, scales = "free_y") +
-    labs(title = "Evolución de la distribución condicional de y_t",
-         x = "y", y = "Densidad") +
-    theme_bw()
-}
+                                                   tiempos = 15,
+                                                   rango_y = c(-0.15, 0.15)) {
+   T      <- length(h_estimado)
+   idx_t  <- round(seq(1, T, length.out = tiempos))
+   y_vals <- seq(rango_y[1], rango_y[2], length.out = 500)
+
+   # construir data.frame largo
+   df_list <- lapply(idx_t, function(t) {
+     var_t <- exp(h_estimado[t])
+     data.frame(t   = factor(t),
+                y   = y_vals,
+                pdf = dnorm(y_vals, 0, sqrt(var_t)))
+   })
+   datos <- do.call(rbind, df_list)
+
+   ggplot(datos, aes(x = y, y = pdf)) +
+     geom_line(colour = "steelblue", linewidth = 1) +
+     facet_wrap(~ t, ncol = 3, scales = "free_y") +
+     labs(title = "Evolución de la distribución condicional de y_t",
+          x = "y", y = "Densidad") +
+     theme_bw()
+ }
 
 # uso:
 graficar_densidades_evolutivas_facets(h_est)
@@ -409,7 +411,7 @@ graficar_densidades_evolutivas_gg(h_est)
 
 
 
-# -------------------------------
+ # -------------------------------
 # Mezcla de las Normales estimads
 # -------------------------------
 
@@ -441,7 +443,6 @@ graficar_distribucion_marginal_y(h_est)
 # ----------------------------------------------------
 # Mezcla de las Normales estimadas con los datos reales
 # -----------------------------------------------------
-
 
 
 comparar_mezcla_con_datos_ggplot <- function(y_data,
