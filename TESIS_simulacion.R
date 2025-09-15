@@ -147,17 +147,30 @@ cat("ESS para mu =", round(ess_mu, 2), "\n")
 cat("ESS para phi_h =", round(ess_phi_h, 2), "\n")
 cat("ESS para sigma_h =", round(ess_sigma_h, 2), "\n")
 
+
 # ---------------------------------------------------------------------
-# 4) Cálculo de promedios posteriores
+# 4) Cálculo de promedios posteriores e intervalos de credibilidad
 # ---------------------------------------------------------------------
-mu_posterior_mean <- mean(mu, na.rm = TRUE)
-phi_h_posterior_mean <- mean(phi_h, na.rm = TRUE)
+
+# Promedios posteriores
+mu_posterior_mean      <- mean(mu, na.rm = TRUE)
+phi_h_posterior_mean   <- mean(phi_h, na.rm = TRUE)
 sigma_h_posterior_mean <- mean(sigma_h, na.rm = TRUE)
 
-cat("Promedios posteriores:\n")
-cat("mu =", round(mu_posterior_mean, 3), "\n")
-cat("phi_h =", round(phi_h_posterior_mean, 3), "\n")
-cat("sigma_h =", round(sigma_h_posterior_mean, 3), "\n")
+# Intervalos de credibilidad (95%)
+mu_CI      <- quantile(mu,      probs = c(0.025, 0.975), na.rm = TRUE)
+phi_h_CI   <- quantile(phi_h,   probs = c(0.025, 0.975), na.rm = TRUE)
+sigma_h_CI <- quantile(sigma_h, probs = c(0.025, 0.975), na.rm = TRUE)
+
+# Mostrar resultados
+cat("Resultados posteriores:\n")
+cat("mu =", round(mu_posterior_mean, 3), 
+    "IC95% [", round(mu_CI[1], 3), ",", round(mu_CI[2], 3), "]\n")
+cat("phi_h =", round(phi_h_posterior_mean, 3), 
+    "IC95% [", round(phi_h_CI[1], 3), ",", round(phi_h_CI[2], 3), "]\n")
+cat("sigma_h =", round(sigma_h_posterior_mean, 3), 
+    "IC95% [", round(sigma_h_CI[1], 3), ",", round(sigma_h_CI[2], 3), "]\n")
+
 
 # ---------------------------------------------------------------------
 # 5) Visualización de Trazas de MCMC
