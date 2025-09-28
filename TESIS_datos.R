@@ -13,8 +13,8 @@ library(ggplot2)  # Para graficos
 library(quantmod) # Para extraer datos financieros
 library(gridExtra)
 library(plotly)
-
-
+library(dplyr)
+library(tidyr)
 
 
 source("TESIS_funciones.R")
@@ -81,182 +81,195 @@ Sigma0 <- diag(c(100, 1))  # Matriz de covarianza (inversa de la matriz de preci
 N_mcmc <- 50000
 set.seed(1234)
 
-# Ejecutar el MCMC
-res_mcmc <- SV_Gibbs(y = y_data, N_mcmc = N_mcmc,
-                     proposal_sd_h = 1.5,
-                     prior_sigma_shape = 1, prior_sigma_rate = 0.02,
-                     b0 = b0, Sigma0 = Sigma0,
-                     mu_init = 0, phi_h_init = 0.001, sigma_h_init = 0.1)
 
-cat("Tasa de aceptación conjunta (mu, phi_h):", res_mcmc$tasa_acept_mu_phi, "\n")
-cat("Tasa de aceptación (h_t):", res_mcmc$tasa_acept_h, "\n")
+## ====== 1) Correr 4 cadenas con inits distintos ======
+set.seed(123)
+n_chains <- 4
 
-
-
-
-
-# Visualización de Trazas de MCMC (Antes de Thinning y Burn-in)
-# plot_trace_pre_thinning <- function(chain, param_name) {
-#   ggplot(data.frame(Iteración = 1:length(chain), Valor = chain), aes(x = Iteración, y = Valor)) +
-#     geom_line(color = "darkorange") +
-#     theme_minimal(base_size = 14) +
-#     labs(title = paste("Traza MCMC para", param_name, "(Antes de Thinning)"), 
-#          y = param_name, x = "Iteración")
-# }
-# 
-# plot_mu_pre <- plot_trace_pre_thinning(res_mcmc$mu, expression(mu))
-# plot_phi_h_pre <- plot_trace_pre_thinning(res_mcmc$phi_h, expression(phi[h]))
-# plot_sigma_h_pre <- plot_trace_pre_thinning(res_mcmc$sigma_h, expression(sigma[h]))
-
-# Imprimir cada gráfico por separado
-# print(plot_mu_pre)
-# print(plot_phi_h_pre)
-# print(plot_sigma_h_pre)
-
-
-# ---------------------------------------------------------------------
-# 1) Autocorrelación Inicial
-# ---------------------------------------------------------------------
-acf(res_mcmc$mu, main = expression("Autocorrelación de " * mu), lag.max = 40)
-acf(res_mcmc$phi_h, main = expression("Autocorrelación de " * phi[h]), lag.max = 40)
-acf(res_mcmc$sigma_h, main = expression("Autocorrelación de " * sigma[h]), lag.max = 40)
-
-# ---------------------------------------------------------------------
-# 2) Aplicar Thinning (si es necesario)
-# -------------------------------------------------------------------
-thinning_step <- 120
-burn_in <- 5000
-mu <- res_mcmc$mu[seq((burn_in + 1), N_mcmc, by = thinning_step)]
-phi_h <- res_mcmc$phi_h[seq((burn_in + 1), N_mcmc, by = thinning_step)]
-sigma_h <- res_mcmc$sigma_h[seq((burn_in + 1), N_mcmc, by = thinning_step)]
-
-# ---------------------------------------------------------------------
-# 1) Autocorrelación despues de Thinning
-# ---------------------------------------------------------------------
-acf(mu, main = expression("Autocorrelación de " * mu), lag.max = 40)
-acf(phi_h, main = expression("Autocorrelación de " * phi[h]), lag.max = 40)
-acf(sigma_h, main = expression("Autocorrelación de " * sigma[h]), lag.max = 40)
-
-# ---------------------------------------------------------------------
-# 3) Calcular el tamaño de muestra efectivo (ESS)
-# ---------------------------------------------------------------------
-ess_mu <- effectiveSize(mu)
-ess_phi_h <- effectiveSize(phi_h)
-ess_sigma_h <- effectiveSize(sigma_h)
-
-cat("Effective Sample Size (ESS):\n")
-cat("ESS para mu =", round(ess_mu, 2), "\n")
-cat("ESS para phi_h =", round(ess_phi_h, 2), "\n")
-cat("ESS para sigma_h =", round(ess_sigma_h, 2), "\n")
-
-# ---------------------------------------------------------------------
-# 4) Cálculo de promedios posteriores e intervalos de credibilidad
-# ---------------------------------------------------------------------
-
-# Promedios posteriores
-mu_posterior_mean      <- mean(mu, na.rm = TRUE)
-phi_h_posterior_mean   <- mean(phi_h, na.rm = TRUE)
-sigma_h_posterior_mean <- mean(sigma_h, na.rm = TRUE)
-
-# Intervalos de credibilidad (95%)
-mu_CI      <- quantile(mu,      probs = c(0.025, 0.975), na.rm = TRUE)
-phi_h_CI   <- quantile(phi_h,   probs = c(0.025, 0.975), na.rm = TRUE)
-sigma_h_CI <- quantile(sigma_h, probs = c(0.025, 0.975), na.rm = TRUE)
-
-# Mostrar resultados
-cat("Resultados posteriores:\n")
-cat("mu =", round(mu_posterior_mean, 3), 
-    "IC95% [", round(mu_CI[1], 3), ",", round(mu_CI[2], 3), "]\n")
-cat("phi_h =", round(phi_h_posterior_mean, 3), 
-    "IC95% [", round(phi_h_CI[1], 3), ",", round(phi_h_CI[2], 3), "]\n")
-cat("sigma_h =", round(sigma_h_posterior_mean, 3), 
-    "IC95% [", round(sigma_h_CI[1], 3), ",", round(sigma_h_CI[2], 3), "]\n")
-
-
-# ---------------------------------------------------------------------
-# 5) Visualización de Trazas de MCMC
-# ---------------------------------------------------------------------
-plot_trace <- function(chain, param_name) {
-  ggplot(data.frame(Iteración = 1:length(chain), Valor = chain), aes(x = Iteración, y = Valor)) +
-    geom_line(color = "steelblue") +
-    theme_minimal(base_size = 14) +
-    labs(title = paste("Traza MCMC para", param_name), y = param_name, x = "Iteración")
-}
-
-plot_mu <- plot_trace(mu, expression(mu))
-plot_phi_h <- plot_trace(phi_h, expression(phi[h]))
-plot_sigma_h <- plot_trace(sigma_h, expression(sigma[h]))
-
-grid.arrange(plot_mu, plot_phi_h, plot_sigma_h, nrow = 1)
-
-
-# ---------------------------------------------------------------------
-# 6) Resúmenes Posteriores de h_t
-# ---------------------------------------------------------------------
-h_posterior_samples <- res_mcmc$h[(burn_in + 1):N_mcmc, ]
-h_posterior_mean <- apply(h_posterior_samples, 2, mean)
-h_posterior_lower <- apply(h_posterior_samples, 2, quantile, probs = 0.025)
-h_posterior_upper <- apply(h_posterior_samples, 2, quantile, probs = 0.975)
-
-tiempo <- 1:length(h_posterior_mean)
-subset_start <- 1
-subset_end <- length(y_data)
-tiempo_subset <- tiempo[subset_start:subset_end]
-h_mean_subset <- h_posterior_mean[subset_start:subset_end]
-h_lower_subset <- h_posterior_lower[subset_start:subset_end]
-h_upper_subset <- h_posterior_upper[subset_start:subset_end]
-
-
-plot_h_estimation <- ggplot() +
-  geom_line(aes(x = tiempo_subset, y = h_mean_subset), color = "blue", size = 0.8) +
-  geom_ribbon(aes(x = tiempo_subset, ymin = h_lower_subset, ymax = h_upper_subset), fill = "red", alpha = 0.2) +
-  theme_minimal(base_size = 14) +
-  labs(title = "Estimación de h con IC del 95%",
-       x = "Tiempo", y = expression(h[t]))
-
-print(plot_h_estimation)
-
-
-
-# Supongamos que y_data y h_posterior_mean son vectores de la misma longitud
-df <- data.frame(
-  Tiempo = 1:length(y_data),
-  Retornos = y_data,
-  Volatilidad = exp(h_posterior_mean)
+# Inits reproducibles y razonables (|phi_h|<1)
+init_list <- list(
+  list(mu_init =  0.0,  phi_h_init =  0.10, sigma_h_init = 0.10),
+  list(mu_init = -1.0,  phi_h_init =  0.70, sigma_h_init = 0.30),
+  list(mu_init =  0.5,  phi_h_init = -0.40, sigma_h_init = 0.20),
+  list(mu_init =  1.0,  phi_h_init =  0.95, sigma_h_init = 0.50) 
 )
 
-# Gráfico de Retornos
-p1 <- ggplot(df, aes(x = Tiempo, y = Retornos)) +
-  geom_line(color = "steelblue", size = 0.7) +
+res_list <- lapply(1:n_chains, function(i) {
+  SV_Gibbs(
+    y = y_data,
+    N_mcmc = N_mcmc,
+    proposal_sd_h = 1.5,
+    prior_sigma_shape = 1, prior_sigma_rate = 0.02,
+    b0 = b0, Sigma0 = Sigma0,
+    mu_init = init_list[[i]]$mu_init,
+    phi_h_init = init_list[[i]]$phi_h_init,
+    sigma_h_init = init_list[[i]]$sigma_h_init
+  )
+})
+
+## Tasa de aceptación por cadena
+acc_table <- data.frame(
+  Cadena = 1:n_chains,
+  `Acept. (mu,phi_h)` = sapply(res_list, \(r) r$tasa_acept_mu_phi),
+  `Acept. (h_t)`      = sapply(res_list, \(r) r$tasa_acept_h)
+)
+print(acc_table, row.names = FALSE)
+
+# ## ====== 2) Traceplots superpuestos (antes de thinning/burn-in) ======
+# df_traces <- bind_rows(lapply(1:n_chains, function(i) {
+#   data.frame(
+#     Iter = 1:N_mcmc,
+#     mu = res_list[[i]]$mu,
+#     phi_h = res_list[[i]]$phi_h,
+#     sigma_h = res_list[[i]]$sigma_h,
+#     Cadena = factor(i)
+#   )
+# }))
+# 
+plot_trace_multi <- function(df, var, title_lab) {
+ggplot(df, aes(x = Iter, y = .data[[var]], color = Cadena)) +
+geom_line(alpha = 0.8) +
+theme_minimal(base_size = 14) +
+labs(title = paste(title_lab),
+        x = "Iteración", y = title_lab)
+}
+# 
+# p_mu_pre    <- plot_trace_multi(df_traces, "mu", expression(mu))
+# p_phi_pre   <- plot_trace_multi(df_traces, "phi_h", expression(phi[h]))
+# p_sig_pre   <- plot_trace_multi(df_traces, "sigma_h", expression(sigma[h]))
+# grid.arrange(p_mu_pre, p_phi_pre, p_sig_pre, nrow = 3)
+# 
+# ## ====== 3) ACF por cadena (antes de thinning/burn-in) ======
+par(mfrow = c(3, n_chains), mar = c(3,3,3,1))
+for (i in 1:n_chains) acf(res_list[[i]]$mu,     main = bquote(ACF~mu~(Cadena==.(i))),     lag.max = 40)
+for (i in 1:n_chains) acf(res_list[[i]]$phi_h,  main = bquote(ACF~phi[h]~(Cadena==.(i))), lag.max = 40)
+for (i in 1:n_chains) acf(res_list[[i]]$sigma_h,main = bquote(ACF~sigma[h]~(Cadena==.(i))), lag.max = 40)
+par(mfrow = c(1,1))
+
+## ====== 4) Thinning y Burn-in ======
+thinning_step <- 120
+burn_in <- 5000
+stopifnot(N_mcmc > burn_in)
+
+keep_idx <- seq(burn_in + 1, N_mcmc, by = thinning_step)
+
+mu_chains     <- lapply(res_list, \(r) r$mu[keep_idx])
+phi_h_chains  <- lapply(res_list, \(r) r$phi_h[keep_idx])
+sigma_h_chains<- lapply(res_list, \(r) r$sigma_h[keep_idx])
+
+## ACF después de thinning
+par(mfrow = c(3, n_chains), mar = c(3,3,3,1))
+for (i in 1:n_chains) acf(mu_chains[[i]],     main = bquote(ACF~mu~thinned~(Cadena==.(i))),     lag.max = 40)
+for (i in 1:n_chains) acf(phi_h_chains[[i]],  main = bquote(ACF~phi[h]~thinned~(Cadena==.(i))), lag.max = 40)
+for (i in 1:n_chains) acf(sigma_h_chains[[i]],main = bquote(ACF~sigma[h]~thinned~(Cadena==.(i))), lag.max = 40)
+par(mfrow = c(1,1))
+
+## ====== 5) ESS por cadena (después de thinning) ======
+ess_mu      <- sapply(mu_chains,     effectiveSize)
+ess_phi_h   <- sapply(phi_h_chains,  effectiveSize)
+ess_sigma_h <- sapply(sigma_h_chains,effectiveSize)
+ess_tab <- data.frame(Cadena = 1:n_chains,
+                      ESS_mu = round(ess_mu,2),
+                      ESS_phi_h = round(ess_phi_h,2),
+                      ESS_sigma_h = round(ess_sigma_h,2))
+cat("Effective Sample Size (ESS) por cadena (thinned):\n")
+print(ess_tab, row.names = FALSE)
+
+## ====== 6) Gelman–Rubin (R-hat) con coda ======
+mu_mcmc_list     <- mcmc.list(lapply(mu_chains,     mcmc))
+phi_h_mcmc_list  <- mcmc.list(lapply(phi_h_chains,  mcmc))
+sigma_h_mcmc_list<- mcmc.list(lapply(sigma_h_chains,mcmc))
+
+cat("\nGelman–Rubin R-hat:\n")
+print(gelman.diag(mu_mcmc_list,     autoburnin = FALSE))
+print(gelman.diag(phi_h_mcmc_list,  autoburnin = FALSE))
+print(gelman.diag(sigma_h_mcmc_list,autoburnin = FALSE))
+
+## ====== 7) Traceplots (después de thinning) superpuestos ======
+df_thin <- bind_rows(lapply(1:n_chains, function(i){
+  data.frame(
+    Iter = seq_along(mu_chains[[i]]),
+    mu = mu_chains[[i]],
+    phi_h = phi_h_chains[[i]],
+    sigma_h = sigma_h_chains[[i]],
+    Cadena = factor(i)
+  )
+}))
+
+p_mu    <- plot_trace_multi(df_thin, "mu",      expression(mu))
+p_phi   <- plot_trace_multi(df_thin, "phi_h",   expression(phi[h]))
+p_sigma <- plot_trace_multi(df_thin, "sigma_h", expression(sigma[h]))
+grid.arrange(p_mu, p_phi, p_sigma, nrow = 1)
+
+## ====== 8) Resúmenes posteriores (combinando 4 cadenas) ======
+mu_all      <- unlist(mu_chains)
+phi_h_all   <- unlist(phi_h_chains)
+sigma_h_all <- unlist(sigma_h_chains)
+
+mu_post_mean      <- mean(mu_all)
+phi_h_post_mean   <- mean(phi_h_all)
+sigma_h_post_mean <- mean(sigma_h_all)
+
+mu_CI      <- quantile(mu_all,      c(0.025, 0.975))
+phi_h_CI   <- quantile(phi_h_all,   c(0.025, 0.975))
+sigma_h_CI <- quantile(sigma_h_all, c(0.025, 0.975))
+
+cat("\nResultados posteriores (4 cadenas combinadas, thinned):\n")
+cat("mu     =", round(mu_post_mean, 3),      "IC95% [", round(mu_CI[1], 3),     ",", round(mu_CI[2], 3),     "]\n")
+cat("phi_h  =", round(phi_h_post_mean, 3),   "IC95% [", round(phi_h_CI[1], 3),   ",", round(phi_h_CI[2], 3),   "]\n")
+cat("sigma_h=", round(sigma_h_post_mean, 3), "IC95% [", round(sigma_h_CI[1], 3), ",", round(sigma_h_CI[2], 3), "]\n")
+
+## ====== 9) h_t: combinar cadenas y resumir ======
+# Cada r$h es matriz [iter x T]. Tomamos filas keep_idx y apilamos.
+h_keep_list <- lapply(res_list, function(r) r$h[keep_idx, , drop = FALSE])
+H_all <- do.call(rbind, h_keep_list)   # [iter_total x T]
+
+h_post_mean  <- colMeans(H_all)
+h_post_lo    <- apply(H_all, 2, quantile, probs = 0.025)
+h_post_hi    <- apply(H_all, 2, quantile, probs = 0.975)
+
+tiempo <- 1:length(h_post_mean)
+plot_h_estimation <- ggplot() +
+  geom_line(aes(x = tiempo, y = h_post_mean), size = 0.8) +
+  geom_ribbon(aes(x = tiempo, ymin = h_post_lo, ymax = h_post_hi), alpha = 0.2) +
+  theme_minimal(base_size = 14) +
+  labs(title = "Estimación de h_t con IC del 95%",
+       x = "Tiempo", y = expression(h[t]))
+print(plot_h_estimation)
+
+## ====== 10) Retornos vs Volatilidad (exp(h)) ======
+df_rv <- data.frame(
+  Tiempo = 1:length(y_data),
+  Retornos = y_data,
+  Volatilidad = exp(h_post_mean)
+)
+
+p1 <- ggplot(df_rv, aes(x = Tiempo, y = Retornos)) +
+  geom_line(size = 0.7) +
   labs(title = "Retornos", x = "Tiempo", y = "Retornos") +
   theme_minimal(base_size = 14)
 
-# Gráfico de Volatilidad
-p2 <- ggplot(df, aes(x = Tiempo, y = Volatilidad)) +
-  geom_line(color = "red", size = 0.7) +
+p2 <- ggplot(df_rv, aes(x = Tiempo, y = Volatilidad)) +
+  geom_line(size = 0.7) +
   labs(title = "Volatilidad Estocástica", x = "Tiempo", y = "Volatilidad (exp)") +
   theme_minimal(base_size = 14)
 
-# Organizar los gráficos en una sola ventana, uno debajo del otro
 grid.arrange(p1, p2, nrow = 2)
 
-
-
-# ---------------------------------------------------------------------
-# 7) Histogramas de mu, phi_h y sigma_h (sin valores verdaderos)
-# ---------------------------------------------------------------------
-plot_hist <- function(chain, param_name) {
-  ggplot(data.frame(Valor = chain), aes(x = Valor)) +
+## ====== 11) Histogramas (4 cadenas combinadas) ======
+plot_hist <- function(x, lab) {
+  ggplot(data.frame(Valor = x), aes(x = Valor)) +
     geom_histogram(bins = 30, fill = "steelblue", color = "black", alpha = 0.7) +
     theme_minimal(base_size = 14) +
-    labs(title = paste(param_name), x = param_name, y = "Frecuencia")
+    labs(title = paste(lab), x = lab, y = "Frecuencia")
 }
+grid.arrange(
+  plot_hist(mu_all,      expression(mu)),
+  plot_hist(phi_h_all,   expression(phi[h])),
+  plot_hist(sigma_h_all, expression(sigma[h])),
+  nrow = 1
+)
 
-plot_hist_mu <- plot_hist(mu, expression(mu))
-plot_hist_phi_h <- plot_hist(phi_h, expression(phi[h]))
-plot_hist_sigma_h <- plot_hist(sigma_h, expression(sigma[h]))
-
-grid.arrange(plot_hist_mu, plot_hist_phi_h, plot_hist_sigma_h, nrow = 1)
 
 
 
@@ -286,7 +299,7 @@ source("TESIS_filtro_de_particulas.R")
 
 # Aplicar el Filtro de Partículas con los parámetros estimados
 N_particulas <- 1000
-h_est <- filtro_particulas(y_data, N_particulas, mu_posterior_mean, phi_h_posterior_mean, sigma_h_posterior_mean )
+h_est <- filtro_particulas(y_data, N_particulas, mu_post_mean, phi_h_post_mean, sigma_h_post_mean )
 
 diagnostico_prediccion_chi <- function(y_data, h_estimado, phi_h, mu, sigma_h, N_particulas = 1000) {
   T <- length(y_data)
@@ -324,7 +337,7 @@ diagnostico_prediccion_chi <- function(y_data, h_estimado, phi_h, mu, sigma_h, N
   
   # Histograma n_t
   hist(normal_prediccion, breaks = 50, probability = TRUE, col = "lightgreen",
-       main = "Histograma de n_t (Transformación Normal)", xlab = "n_t", ylab = "Densidad", ylim = c(0, 0.6))
+       main = "Hist de n_t (Transf Normal)", xlab = "n_t", ylab = "Densidad", ylim = c(0, 0.6))
   curve(dnorm(x, 0, 1), add = TRUE, col = "red", lwd = 2)
   
   # Densidad n_t
@@ -343,7 +356,7 @@ diagnostico_prediccion_chi <- function(y_data, h_estimado, phi_h, mu, sigma_h, N
 
 
 # Diagnóstico en la predicción
-result_prediction_chi <- diagnostico_prediccion_chi(y_data, h_est, phi_h, mu, sigma_h)
+result_prediction_chi <- diagnostico_prediccion_chi(y_data, h_est, phi_h_post_mean, mu_post_mean, sigma_h_post_mean)
 print("Diagnóstico en la predicción (usando Chi-cuadrado escalada con Y^2):")
 print(result_prediction_chi)
 
